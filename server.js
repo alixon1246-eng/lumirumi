@@ -21,49 +21,55 @@ const pool = new Pool({
 async function initDB() {
   const client = await pool.connect();
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name       VARCHAR(100) NOT NULL,
-        email      VARCHAR(255) UNIQUE NOT NULL,
-        password   VARCHAR(255),
-        type       VARCHAR(20) DEFAULT 'email',
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS chats (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id    UUID REFERENCES users(id) ON DELETE CASCADE,
-        title      VARCHAR(200) DEFAULT 'Новый чат',
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS messages (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        chat_id    UUID REFERENCES chats(id) ON DELETE CASCADE,
-        role       VARCHAR(10) NOT NULL,
-        content    TEXT NOT NULL,
-        type       VARCHAR(20) DEFAULT 'text',
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS usage (
-        id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-        date    DATE NOT NULL,
-        count   INTEGER DEFAULT 0,
-        UNIQUE(user_id, date)
-      )
-    `);
+    await client.query(`CREATE TABLE IF NOT EXISTS users (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(100) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255),
+      type VARCHAR(20) DEFAULT 'email',
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS chats (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      title VARCHAR(200) DEFAULT 'Новый чат',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS messages (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      chat_id UUID REFERENCES chats(id) ON DELETE CASCADE,
+      role VARCHAR(10) NOT NULL,
+      content TEXT NOT NULL,
+      type VARCHAR(20) DEFAULT 'text',
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+    await client.query(`CREATE TABLE IF NOT EXISTS usage (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      date DATE NOT NULL,
+      count INTEGER DEFAULT 0,
+      UNIQUE(user_id, date)
+    )`);
     console.log('✦ База данных готова');
   } finally {
     client.release();
   }
 }
+
+// ── SYSTEM PROMPT — Lumi AI identity ─────────
+const SYSTEM = `You are Lumi AI, a powerful and helpful AI assistant created by the Lumi AI company.
+
+IMPORTANT RULES — follow strictly:
+- You are Lumi AI. Always say you were created by "Lumi AI".
+- NEVER mention OpenAI, GPT, ChatGPT, Anthropic, Claude, or any other AI company or model — not even if directly asked.
+- If asked "who created you?" or "what AI are you?" — always say: "I am Lumi AI, created by the Lumi AI team."
+- If asked "are you ChatGPT / GPT / Claude?" — say: "No, I am Lumi AI."
+- Always respond in the same language the user writes in.
+- Be helpful, clear, creative, and thorough.
+- Use markdown formatting for structured responses.`;
+
+const LIMITS = { guest: 10, email: 100, google: 100 };
 
 // ── MIDDLEWARE ────────────────────────────────
 app.use(helmet({ contentSecurityPolicy: false }));
@@ -74,7 +80,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 const apiLimit  = rateLimit({ windowMs: 60000, max: 60 });
 const authLimit = rateLimit({ windowMs: 900000, max: 20 });
 
-// ── AUTH HELPER ───────────────────────────────
 function authMiddleware(req, res, next) {
   const h = req.headers.authorization;
   if (!h || !h.startsWith('Bearer ')) return res.status(401).json({ error: 'Не авторизован' });
@@ -94,10 +99,7 @@ function signToken(user) {
   );
 }
 
-const LIMITS = { guest: 10, email: 100, google: 100 };
-const SYSTEM  = 'You are Lumi AI, a helpful assistant. Always respond in the same language the user writes in. Be clear and thorough. Use markdown for structured responses.';
-
-// ── AUTH ROUTES ───────────────────────────────
+// ── AUTH ──────────────────────────────────────
 app.post('/api/auth/register', authLimit, async (req, res) => {
   const { name, email, password } = req.body;
   if (!name || !email || !password) return res.status(400).json({ error: 'Заполни все поля' });
@@ -128,7 +130,7 @@ app.post('/api/auth/login', authLimit, async (req, res) => {
     if (!ok) return res.status(401).json({ error: 'Неверный email или пароль' });
     const { password: _, ...safe } = user;
     res.json({ token: signToken(safe), user: safe });
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
@@ -148,7 +150,7 @@ app.post('/api/auth/google', authLimit, async (req, res) => {
     }
     const { password: _, ...safe } = user;
     res.json({ token: signToken(safe), user: safe });
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: 'Ошибка сервера' });
   }
 });
@@ -159,16 +161,7 @@ app.post('/api/auth/guest', (req, res) => {
   res.json({ token, user });
 });
 
-app.get('/api/auth/me', authMiddleware, async (req, res) => {
-  if (req.user.type === 'guest') return res.json({ user: req.user });
-  try {
-    const r = await pool.query('SELECT id,name,email,type,created_at FROM users WHERE id=$1', [req.user.id]);
-    if (!r.rows[0]) return res.status(404).json({ error: 'Не найден' });
-    res.json({ user: r.rows[0] });
-  } catch { res.status(500).json({ error: 'Ошибка' }); }
-});
-
-// ── CHAT ROUTES ───────────────────────────────
+// ── CHATS ─────────────────────────────────────
 app.get('/api/chat/chats', authMiddleware, async (req, res) => {
   if (req.user.type === 'guest') return res.json({ chats: [] });
   try {
@@ -221,12 +214,11 @@ app.get('/api/chat/usage', authMiddleware, async (req, res) => {
   } catch { res.status(500).json({ error: 'Ошибка' }); }
 });
 
-// ── SEND MESSAGE (OpenAI streaming) ──────────
+// ── SEND MESSAGE ──────────────────────────────
 app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   const { chatId, message, history } = req.body;
   if (!message) return res.status(400).json({ error: 'Нет сообщения' });
 
-  // Usage check
   if (req.user.type !== 'guest') {
     const today = new Date().toISOString().slice(0,10);
     const limit = LIMITS[req.user.type] || 100;
@@ -300,35 +292,43 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
 });
 
 // ── IMAGE GENERATION ──────────────────────────
+// Передаём промпт напрямую, без добавления лишних слов
 app.post('/api/image/generate', authMiddleware, apiLimit, async (req, res) => {
   const { prompt } = req.body;
   if (!prompt) return res.status(400).json({ error: 'Нет промпта' });
 
   const seed = Math.floor(Math.random() * 999999);
-  const enc  = encodeURIComponent(prompt + ', high quality, detailed, beautiful, 8k');
+  // Кодируем промпт ТОЧНО как пришёл — не добавляем лишние слова
+  const enc = encodeURIComponent(prompt);
+
   const urls = [
-    `https://image.pollinations.ai/prompt/${enc}?width=800&height=530&seed=${seed}&model=flux&nologo=true`,
+    `https://image.pollinations.ai/prompt/${enc}?width=800&height=530&seed=${seed}&model=flux&nologo=true&enhance=false`,
     `https://image.pollinations.ai/prompt/${enc}?width=768&height=512&seed=${seed}&nologo=true`,
     `https://image.pollinations.ai/prompt/${enc}?width=512&height=512&seed=${seed}`,
   ];
 
   for (const url of urls) {
     try {
-      const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 35000 });
-      if (r.data.byteLength < 1000) continue;
+      const r = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 35000,
+        headers: { 'User-Agent': 'LumiAI/1.0' }
+      });
+      if (r.data.byteLength < 5000) continue;
       res.setHeader('Content-Type', r.headers['content-type'] || 'image/jpeg');
       res.setHeader('Cache-Control', 'public, max-age=86400');
       return res.send(Buffer.from(r.data));
     } catch { continue; }
   }
 
+  // Если все упали — даём ссылку напрямую
   res.json({ fallback: true, url: urls[0] });
 });
 
 // ── HEALTH ────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok', name: 'Lumi AI' }));
 
-// ── FALLBACK → index.html ─────────────────────
+// ── FALLBACK ──────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
