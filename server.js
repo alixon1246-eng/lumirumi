@@ -251,7 +251,7 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   try {
     const oRes = await axios.post(
       'https://api.openai.com/v1/chat/completions',
-      { model: 'gpt-4o', stream: true, messages: apiMessages },
+      { model: 'gpt-4o', stream: true, messages: apiMessages temperature: 0.9,  max_tokens: 2000,},
       {
         headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         responseType: 'stream', timeout: 120000
