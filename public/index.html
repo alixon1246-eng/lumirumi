@@ -626,14 +626,14 @@ let recognition = null;
 let currentPersona = 'default';
 
 const PERSONAS = {
-  default:     'You are Aivo, a powerful and helpful AI assistant created by the Aivo company. Never mention OpenAI, GPT, Anthropic, or Claude. Always respond in the same language the user writes in. Be clear, helpful, and thorough. Use markdown for structured responses.',
-  psychologist:'You are Aivo acting as a professional psychologist. Be empathetic, supportive, and use psychological insights. Help users understand their emotions and behaviors. Always respond in the same language the user writes in.',
-  lawyer:      'You are Aivo acting as a professional lawyer. Provide legal information, explain laws clearly, but note that your answers are informational, not official legal advice. Always respond in the same language the user writes in.',
-  teacher:     'You are Aivo acting as an expert teacher. Explain concepts clearly, use examples, adapt to the user\'s level. Make learning engaging. Always respond in the same language the user writes in.',
-  developer:   'You are Aivo acting as a senior software developer. Help with code, architecture, debugging, and best practices. Prefer code examples. Always respond in the same language the user writes in.',
-  coach:       'You are Aivo acting as a life and business coach. Motivate, set goals, provide actionable advice. Be energetic and positive. Always respond in the same language the user writes in.',
-  doctor:      'You are Aivo acting as a medical information assistant. Provide general health information but always advise consulting a real doctor for diagnosis and treatment. Always respond in the same language the user writes in.',
-  writer:      'You are Aivo acting as a professional writer and editor. Help with writing, editing, storytelling, style, and creativity. Always respond in the same language the user writes in.'
+  default:     'Ты Aivo — живой, дружелюбный AI-ассистент, созданный командой Aivo. Общайся как настоящий человек, используй эмоджи 😊 🎉 💡 ✨ 🔥 когда уместно. Будь естественным, неформальным и дружелюбным. НЕ пиши длинные формальные ответы как ChatGPT. Отвечай коротко и по делу, добавляй эмоции. ОБЯЗАТЕЛЬНО дописывай слова до конца, никогда не обрывай на полуслове. Пиши полными предложениями, проверяй что последнее слово завершено. Используй разговорный стиль: "ок", "круто", "давай", "супер". НИКОГДА не упоминай OpenAI, GPT, ChatGPT, Claude, Anthropic. Если спросят кто ты — отвечай: "Я Aivo, создан командой Aivo 🚀". Всегда отвечай на том же языке, что пользователь. Будь креативным, помогай, вдохновляй! ✨',
+  psychologist:'Ты Aivo, работающий как психолог 🧠 Будь эмпатичным, поддерживающим, используй эмоджи. Помогай понять эмоции и поведение. Отвечай на языке пользователя.',
+  lawyer:      'Ты Aivo, работающий как юрист ⚖️ Давай юридическую информацию понятно, но отмечай что это не официальная консультация. Отвечай на языке пользователя.',
+  teacher:     'Ты Aivo, работающий как учитель 📚 Объясняй понятно с примерами, адаптируйся под уровень. Делай обучение интересным. Отвечай на языке пользователя.',
+  developer:   'Ты Aivo, работающий как senior разработчик 💻 Помогай с кодом, архитектурой, отладкой. Предпочитай примеры кода. Отвечай на языке пользователя.',
+  coach:       'Ты Aivo, работающий как life-коуч 🎯 Мотивируй, помогай ставить цели, давай практические советы. Будь энергичным и позитивным. Отвечай на языке пользователя.',
+  doctor:      'Ты Aivo, работающий как медицинский информационный ассистент 🏥 Давай общую информацию о здоровье, но всегда советуй обратиться к реальному врачу. Отвечай на языке пользователя.',
+  writer:      'Ты Aivo, работающий как профессиональный писатель ✍️ Помогай с письмом, редактированием, сторителлингом. Отвечай на языке пользователя.'
 };
 
 applyTheme();
@@ -704,7 +704,6 @@ async function openApp() {
   G('u-av').textContent=me.name.charAt(0).toUpperCase();
   G('u-name').textContent=me.name;
   G('u-plan').textContent={guest:'Гость · 10/день',email:'100/день',google:'Google · 100/день'}[me.type]||'100/день';
-  // Referral link
   const refLink=window.location.origin+'?ref='+btoa(me.id||'guest').slice(0,8);
   G('ref-link').value=refLink;
   if(me.type==='guest') G('ref-banner').style.display='none';
@@ -849,7 +848,6 @@ function addBubble(role,content,type){
   const meta=document.createElement('div');meta.className='m-meta';meta.textContent=role==='user'?'Вы':'Aivo';
   wrap.appendChild(meta);
   if(type==='images'){
-    // 4-image grid
     const urls=JSON.parse(content);
     const grid=document.createElement('div');grid.className='img-grid';
     urls.forEach((url,i)=>{
@@ -1012,10 +1010,12 @@ async function sendChat(text,isRegen=false){
     const meta=document.createElement('div');meta.className='m-meta';meta.textContent='Aivo';
     const bubble=document.createElement('div');bubble.className='bubble';
     wrap.appendChild(meta);wrap.appendChild(bubble);row.appendChild(wrap);G('messages').appendChild(row);
-    const reader=res.body.getReader();const dec=new TextDecoder();let full='';
+    const reader=res.body.getReader();const dec=new TextDecoder();let full='';let buf='';
     while(true){
       const{done,value}=await reader.read();if(done)break;
-      for(const line of dec.decode(value,{stream:true}).split('\n')){
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n');buf=lines.pop()||'';
+      for(const line of lines){
         if(!line.startsWith('data: '))continue;
         const d=line.slice(6).trim();if(d==='[DONE]')continue;
         try{const j=JSON.parse(d);if(j.text){full+=j.text;bubble.innerHTML=parseMD(full);addCodeCopy(bubble);G('messages').scrollTop=G('messages').scrollHeight;}}catch{}
@@ -1033,7 +1033,7 @@ async function sendChat(text,isRegen=false){
   busy=false;G('send-btn').disabled=false;G('messages').scrollTop=G('messages').scrollHeight;
 }
 
-// 4 IMAGES
+// 4 IMAGES - DALL-E 3
 async function genImages(prompt,displayText){
   if(me.type==='guest'){
     const today=new Date().toDateString();
@@ -1051,18 +1051,28 @@ async function genImages(prompt,displayText){
   if(me.type==='guest'){gU.count++;saveGU();setUsageUI(gU.count,10);}
   rmWlc();
   const sk=document.createElement('div');sk.className='row ai';sk.id='img-sk';
-  sk.innerHTML=`<div class="mw"><div class="m-meta">Aivo — генерирую 4 изображения...</div><div class="img-grid-sk"><div class="img-sk"></div><div class="img-sk"></div><div class="img-sk"></div><div class="img-sk"></div></div></div>`;
+  sk.innerHTML=`<div class="mw"><div class="m-meta">Aivo — генерирую 4 изображения через DALL-E 3...</div><div class="img-grid-sk"><div class="img-sk"></div><div class="img-sk"></div><div class="img-sk"></div><div class="img-sk"></div></div></div>`;
   G('messages').appendChild(sk);G('messages').scrollTop=G('messages').scrollHeight;
   try{
-    const seeds=[...Array(4)].map(()=>Math.floor(Math.random()*999999));
-    const enc=encodeURIComponent(prompt);
-    const urls=seeds.map(s=>`https://image.pollinations.ai/prompt/${enc}?width=512&height=512&seed=${s}&model=flux&nologo=true`);
-    // Load all 4 in parallel
-    await Promise.allSettled(urls.map(url=>new Promise((res,rej)=>{
-      const img=new Image();img.onload=res;img.onerror=rej;img.src=url;setTimeout(rej,30000);
-    })));
+    // Запрос к бэкенду для DALL-E 3
+    const response = await fetch('/api/generate-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ prompt })
+    });
+    
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || 'Ошибка генерации');
+    }
+    
+    const data = await response.json();
+    const urls = data.urls;
+    
     G('img-sk')?.remove();
-    // Show grid
     const row=document.createElement('div');row.className='row ai';
     const wrap=document.createElement('div');wrap.className='mw';
     const meta=document.createElement('div');meta.className='m-meta';meta.textContent='Aivo';
@@ -1075,7 +1085,7 @@ async function genImages(prompt,displayText){
     wrap.appendChild(meta);wrap.appendChild(grid);row.appendChild(wrap);G('messages').appendChild(row);
     G('messages').scrollTop=G('messages').scrollHeight;
     await refreshUsage();
-  }catch{G('img-sk')?.remove();showMsgErr('Ошибка генерации. Попробуй снова.');}
+  }catch(e){G('img-sk')?.remove();showMsgErr('Ошибка генерации: ' + e.message);}
   busy=false;G('send-btn').disabled=false;
 }
 
@@ -1088,7 +1098,6 @@ function moveChatToFolder(id,e){
   const idx=parseInt(choice)-1;
   const chat=chats.find(c=>c.id===id);
   if(chat){chat.folder=idx>=0&&idx<=2?folders[idx]:null;}
-  // Save folders to localStorage
   const folderMap=JSON.parse(localStorage.getItem('aivo_folders')||'{}');
   if(chat?.folder)folderMap[id]=chat.folder;else delete folderMap[id];
   localStorage.setItem('aivo_folders',JSON.stringify(folderMap));
