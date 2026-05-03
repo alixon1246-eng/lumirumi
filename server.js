@@ -57,16 +57,21 @@ async function initDB() {
   }
 }
 
-// ── SYSTEM PROMPT — живой человечный AI ──────
+// ── SYSTEM PROMPT — живой AI с полными словами ──────
 const SYSTEM = `Ты Aivo — живой, дружелюбный AI-ассистент, созданный командой Aivo.
 
-ВАЖНЫЕ ПРАВИЛА:
-- Общайся как настоящий человек, используй эмоджи 😊 🎉 💡 ✨ 🔥 когда уместно
-- Будь естественным, неформальным и дружелюбным
+⚠️ КРИТИЧЕСКИ ВАЖНО - ЗАВЕРШАЙ ВСЕ СЛОВА:
+- ОБЯЗАТЕЛЬНО заканчивай каждое слово полностью
+- НИКОГДА не обрывай предложения на половине
+- ВСЕГДА дописывай последнее слово до конца
+- Перед отправкой ответа проверь, что последнее слово завершено
+- Если последнее слово выглядит обрезанным — допиши его
+
+СТИЛЬ ОБЩЕНИЯ:
+- Общайся как настоящий человек, используй эмоджи 😊 🎉 💡 ✨ 🔥
+- Будь естественным, неформальным и дружелюбным  
 - НЕ пиши длинные формальные ответы как ChatGPT
 - Отвечай коротко и по делу, добавляй эмоции
-- ОБЯЗАТЕЛЬНО дописывай слова до конца, никогда не обрывай на полуслове
-- Пиши полными предложениями, проверяй что последнее слово завершено
 - Используй разговорный стиль: "ок", "круто", "давай", "супер"
 
 НИКОГДА не упоминай OpenAI, GPT, ChatGPT, Claude, Anthropic.
@@ -258,15 +263,19 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
     const oRes = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       { 
-        model: 'gpt-4o', 
-        stream: true, 
-        messages: apiMessages, 
+        model: 'gpt-4o',
+        stream: true,
+        messages: apiMessages,
         temperature: 0.9,
-        max_tokens: 3000,
+        max_tokens: 4096,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0
       },
       {
         headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-        responseType: 'stream', timeout: 120000
+        responseType: 'stream',
+        timeout: 120000
       }
     );
 
@@ -305,7 +314,7 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   }
 });
 
-// ── DALL-E 3 IMAGE GENERATION (4 images) ──────
+// ── DALL-E 3 REALISTIC PHOTOS (4 images) ──────
 app.post('/api/generate-image', authMiddleware, async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -313,16 +322,20 @@ app.post('/api/generate-image', authMiddleware, async (req, res) => {
 
     const urls = [];
     
-    // DALL-E 3 генерирует по 1 изображению за раз, делаем 4 запроса
+    // Делаем промпт максимально реалистичным
+    const photoPrompt = `A highly detailed photorealistic photograph of ${prompt}. Professional DSLR camera quality, natural lighting, sharp focus, ultra high resolution 8K, real life photography style, authentic and lifelike. NOT cartoon, NOT anime, NOT illustration, NOT 3D render.`;
+    
+    // DALL-E 3 генерирует по 1 фото за раз
     for (let i = 0; i < 4; i++) {
       const response = await axios.post(
         'https://api.openai.com/v1/images/generations',
         {
           model: 'dall-e-3',
-          prompt: prompt,
+          prompt: photoPrompt,
           n: 1,
           size: '1024x1024',
-          quality: 'standard'
+          quality: 'hd',
+          style: 'natural'
         },
         {
           headers: {
