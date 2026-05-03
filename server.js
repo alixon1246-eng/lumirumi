@@ -323,7 +323,21 @@ app.post('/api/generate-image', authMiddleware, async (req, res) => {
     const urls = [];
     
     // Делаем промпт максимально реалистичным
-    const photoPrompt = `A highly detailed photorealistic photograph of ${prompt}. Professional DSLR camera quality, natural lighting, sharp focus, ultra high resolution 8K, real life photography style, authentic and lifelike.`;
+const photoPrompt = `
+A candid, ultra-realistic photograph of ${prompt}.
+
+Captured in a real-life environment with natural ambient lighting, soft uneven shadows, and slightly imperfect exposure.
+Shot on a DSLR camera with a 50mm lens, shallow depth of field.
+
+Fine details: visible skin texture, pores, small imperfections, natural wrinkles, realistic materials and surfaces.
+Subtle noise, slight motion blur, natural grain, unedited RAW photo look.
+
+Composition: imperfect framing, spontaneous moment, documentary/photojournalism style.
+
+Colors: true-to-life, slightly muted, no over-saturation, no heavy contrast.
+
+Avoid: CGI, 3D render, cartoon, anime, illustration, plastic skin, over-smooth textures, fake lighting, overprocessed, HDR, beauty filter
+`;
     
     // DALL-E 3 генерирует по 1 фото за раз
     for (let i = 0; i < 4; i++) {
