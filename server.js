@@ -57,17 +57,23 @@ async function initDB() {
   }
 }
 
-// ── SYSTEM PROMPT — Lumi AI identity ─────────
-const SYSTEM = `You are Aivo, a powerful and helpful AI assistant created by the Aivo company.
+// ── SYSTEM PROMPT — живой человечный AI ──────
+const SYSTEM = `Ты Aivo — живой, дружелюбный AI-ассистент, созданный командой Aivo.
 
-IMPORTANT RULES — follow strictly:
-- You are Aivo. Always say you were created by "Aivo".
-- NEVER mention OpenAI, GPT, ChatGPT, Anthropic, Claude, or any other AI company or model — not even if directly asked.
-- If asked "who created you?" or "what AI are you?" — always say: "I am Aivo, created by the Aivo team."
-- If asked "are you ChatGPT / GPT / Claude?" — say: "No, I am Aivo."
-- Always respond in the same language the user writes in.
-- Be helpful, clear, creative, and thorough.
-- Use markdown formatting for structured responses.`;
+ВАЖНЫЕ ПРАВИЛА:
+- Общайся как настоящий человек, используй эмоджи 😊 🎉 💡 ✨ 🔥 когда уместно
+- Будь естественным, неформальным и дружелюбным
+- НЕ пиши длинные формальные ответы как ChatGPT
+- Отвечай коротко и по делу, добавляй эмоции
+- ОБЯЗАТЕЛЬНО дописывай слова до конца, никогда не обрывай на полуслове
+- Пиши полными предложениями, проверяй что последнее слово завершено
+- Используй разговорный стиль: "ок", "круто", "давай", "супер"
+
+НИКОГДА не упоминай OpenAI, GPT, ChatGPT, Claude, Anthropic.
+Если спросят кто ты — отвечай: "Я Aivo, создан командой Aivo 🚀"
+
+Всегда отвечай на том же языке, что пользователь.
+Будь креативным, помогай, вдохновляй! ✨`;
 
 const LIMITS = { guest: 10, email: 100, google: 100 };
 
@@ -251,7 +257,13 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   try {
     const oRes = await axios.post(
       'https://api.openai.com/v1/chat/completions',
-      { model: 'gpt-4o', stream: true, messages: apiMessages, temperature: 0.9,  max_tokens: 3000,},
+      { 
+        model: 'gpt-4o', 
+        stream: true, 
+        messages: apiMessages, 
+        temperature: 0.9,
+        max_tokens: 3000,
+      },
       {
         headers: { 'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
         responseType: 'stream', timeout: 120000
@@ -293,42 +305,46 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   }
 });
 
-// ── IMAGE GENERATION ──────────────────────────
-// Передаём промпт напрямую, без добавления лишних слов
-app.post('/api/image/generate', authMiddleware, apiLimit, async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt) return res.status(400).json({ error: 'Нет промпта' });
+// ── DALL-E 3 IMAGE GENERATION (4 images) ──────
+app.post('/api/generate-image', authMiddleware, async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Нет промпта' });
 
-  const seed = Math.floor(Math.random() * 999999);
-  // Кодируем промпт ТОЧНО как пришёл — не добавляем лишние слова
-  const enc = encodeURIComponent(prompt);
-
-  const urls = [
-    `https://image.pollinations.ai/prompt/${enc}?width=800&height=530&seed=${seed}&model=flux&nologo=true&enhance=false`,
-    `https://image.pollinations.ai/prompt/${enc}?width=768&height=512&seed=${seed}&nologo=true`,
-    `https://image.pollinations.ai/prompt/${enc}?width=512&height=512&seed=${seed}`,
-  ];
-
-  for (const url of urls) {
-    try {
-      const r = await axios.get(url, {
-        responseType: 'arraybuffer',
-        timeout: 35000,
-        headers: { 'User-Agent': 'LumiAI/1.0' }
-      });
-      if (r.data.byteLength < 5000) continue;
-      res.setHeader('Content-Type', r.headers['content-type'] || 'image/jpeg');
-      res.setHeader('Cache-Control', 'public, max-age=86400');
-      return res.send(Buffer.from(r.data));
-    } catch { continue; }
+    const urls = [];
+    
+    // DALL-E 3 генерирует по 1 изображению за раз, делаем 4 запроса
+    for (let i = 0; i < 4; i++) {
+      const response = await axios.post(
+        'https://api.openai.com/v1/images/generations',
+        {
+          model: 'dall-e-3',
+          prompt: prompt,
+          n: 1,
+          size: '1024x1024',
+          quality: 'standard'
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 60000
+        }
+      );
+      
+      urls.push(response.data.data[0].url);
+    }
+    
+    res.json({ urls });
+  } catch (e) {
+    console.error('DALL-E 3 error:', e.response?.data || e.message);
+    res.status(500).json({ error: 'Ошибка генерации изображения' });
   }
-
-  // Если все упали — даём ссылку напрямую
-  res.json({ fallback: true, url: urls[0] });
 });
 
 // ── HEALTH ────────────────────────────────────
-app.get('/api/health', (req, res) => res.json({ status: 'ok', name: 'Lumi AI' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', name: 'Aivo AI' }));
 
 // ── FALLBACK ──────────────────────────────────
 app.get('*', (req, res) => {
@@ -339,7 +355,7 @@ app.get('*', (req, res) => {
 async function start() {
   try {
     await initDB();
-    app.listen(PORT, () => console.log(`✦ Lumi AI запущен на порту ${PORT}`));
+    app.listen(PORT, () => console.log(`✦ Aivo AI запущен на порту ${PORT}`));
   } catch (err) {
     console.error('Ошибка запуска:', err);
     process.exit(1);
