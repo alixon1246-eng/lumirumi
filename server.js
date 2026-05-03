@@ -323,7 +323,7 @@ app.post('/api/generate-image', authMiddleware, async (req, res) => {
     const urls = [];
     
     // Делаем промпт максимально реалистичным
-    const photoPrompt = `A highly detailed photorealistic photograph of ${prompt}. Professional DSLR camera quality, natural lighting, sharp focus, ultra high resolution 8K, real life photography style, authentic and lifelike. NOT cartoon, NOT anime, NOT illustration, NOT 3D render.`;
+    const photoPrompt = `A highly detailed photorealistic photograph of ${prompt}. Professional DSLR camera quality, natural lighting, sharp focus, ultra high resolution 8K, real life photography style, authentic and lifelike.`;
     
     // DALL-E 3 генерирует по 1 фото за раз
     for (let i = 0; i < 4; i++) {
