@@ -314,7 +314,7 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   }
 });
 
-// ── DALL-E 3 REALISTIC PHOTOS (4 images) ──────
+// ── IMAGE GENERATION через OpenAI Images API (DALL-E 3) ──────
 app.post('/api/generate-image', authMiddleware, async (req, res) => {
   try {
     const { prompt } = req.body;
@@ -322,24 +322,10 @@ app.post('/api/generate-image', authMiddleware, async (req, res) => {
 
     const urls = [];
     
-    // Делаем промпт максимально реалистичным
-const photoPrompt = `
-A candid, ultra-realistic photograph of ${prompt}.
-
-Captured in a real-life environment with natural ambient lighting, soft uneven shadows, and slightly imperfect exposure.
-Shot on a DSLR camera with a 50mm lens, shallow depth of field.
-
-Fine details: visible skin texture, pores, small imperfections, natural wrinkles, realistic materials and surfaces.
-Subtle noise, slight motion blur, natural grain, unedited RAW photo look.
-
-Composition: imperfect framing, spontaneous moment, documentary/photojournalism style.
-
-Colors: true-to-life, slightly muted, no over-saturation, no heavy contrast.
-
-Avoid: CGI, 3D render, cartoon, anime, illustration, plastic skin, over-smooth textures, fake lighting, overprocessed, HDR, beauty filter
-`;
+    // Делаем промпт реалистичным
+    const photoPrompt = `A highly detailed photorealistic photograph of ${prompt}. Professional DSLR camera quality, natural lighting, sharp focus, ultra high resolution 8K, real life photography style, authentic and lifelike. NOT cartoon, NOT anime, NOT illustration, NOT 3D render.`;
     
-    // DALL-E 3 генерирует по 1 фото за раз
+    // DALL-E 3 генерирует по 1 фото за раз, делаем 4 запроса
     for (let i = 0; i < 4; i++) {
       const response = await axios.post(
         'https://api.openai.com/v1/images/generations',
@@ -365,7 +351,7 @@ Avoid: CGI, 3D render, cartoon, anime, illustration, plastic skin, over-smooth t
     
     res.json({ urls });
   } catch (e) {
-    console.error('DALL-E 3 error:', e.response?.data || e.message);
+    console.error('Image generation error:', e.response?.data || e.message);
     res.status(500).json({ error: 'Ошибка генерации изображения' });
   }
 });
