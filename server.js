@@ -314,43 +314,31 @@ app.post('/api/chat/send', authMiddleware, apiLimit, async (req, res) => {
   }
 });
 
-// ── IMAGE GENERATION через gpt-image-1 (новая модель) ──────
+// ── IMAGE GENERATION через Pollinations (бесплатно, работает) ──────
 app.post('/api/generate-image', authMiddleware, async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: 'Нет промпта' });
 
-    const urls = [];
+    // Генерируем 4 разных URL с разными seed
+    const seeds = [
+      Math.floor(Math.random() * 999999),
+      Math.floor(Math.random() * 999999),
+      Math.floor(Math.random() * 999999),
+      Math.floor(Math.random() * 999999)
+    ];
     
     // Делаем промпт реалистичным
-    const photoPrompt = `A highly detailed photorealistic photograph of ${prompt}. Professional DSLR camera quality, natural lighting, sharp focus, ultra high resolution 8K, real life photography style, authentic and lifelike. NOT cartoon, NOT anime, NOT illustration, NOT 3D render.`;
+    const photoPrompt = `${prompt}, professional photography, DSLR camera, 8K resolution, photorealistic, natural lighting, sharp focus, realistic, NOT anime, NOT cartoon, NOT illustration`;
+    const enc = encodeURIComponent(photoPrompt);
     
-    // gpt-image-1 может генерировать несколько изображений за раз
-    const response = await axios.post(
-      'https://api.openai.com/v1/images/generations',
-      {
-        model: 'gpt-image-1',
-        prompt: photoPrompt,
-        n: 1,  // 4 изображения за раз
-        size: '1024x1024',
-        quality: 'hd',
-        response_format: 'url'
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 90000
-      }
+    const urls = seeds.map(seed => 
+      `https://image.pollinations.ai/prompt/${enc}?width=1024&height=1024&seed=${seed}&model=flux&nologo=true&enhance=true`
     );
-    
-    // Собираем все URL
-    response.data.data.forEach(img => urls.push(img.url));
     
     res.json({ urls });
   } catch (e) {
-    console.error('gpt-image-1 error:', e.response?.data || e.message);
+    console.error('Image generation error:', e.message);
     res.status(500).json({ error: 'Ошибка генерации изображения' });
   }
 });
